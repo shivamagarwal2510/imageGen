@@ -1,5 +1,9 @@
-import axios from 'axios';
-import { ImageGenerationRequest, ImageGenerationResponse, GeneratedImage } from '../types/image-generation';
+import axios from "axios";
+import {
+  ImageGenerationRequest,
+  ImageGenerationResponse,
+  GeneratedImage
+} from "../types/image-generation";
 
 class GoogleImageAPI {
   private projectId: string;
@@ -7,9 +11,9 @@ class GoogleImageAPI {
   private location: string;
 
   constructor() {
-    this.projectId = import.meta.env.VITE_GOOGLE_CLOUD_PROJECT_ID || '';
-    this.apiKey = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY || '';
-    this.location = import.meta.env.VITE_VERTEX_AI_LOCATION || 'us-central1';
+    this.projectId = import.meta.env.VITE_GOOGLE_CLOUD_PROJECT_ID || "";
+    this.apiKey = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY || "";
+    this.location = import.meta.env.VITE_VERTEX_AI_LOCATION || "us-central1";
   }
 
   private getEndpoint(): string {
@@ -18,8 +22,14 @@ class GoogleImageAPI {
 
   async generateImages(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
     try {
-      // Check if API key is configured
-      if (!this.apiKey || this.apiKey === 'YOUR_API_KEY') {
+      // Check if API key and project ID are configured
+      if (
+        !this.apiKey ||
+        this.apiKey === "YOUR_API_KEY" ||
+        !this.projectId ||
+        this.projectId === "your-project-id-here"
+      ) {
+        console.warn("Google Cloud credentials not configured. Using mock generation.");
         return this.mockGeneration(request);
       }
 
@@ -27,12 +37,12 @@ class GoogleImageAPI {
         instances: [
           {
             prompt: request.prompt,
-            negativePrompt: request.negativePrompt || '',
-            aspectRatio: request.aspectRatio || '1:1',
+            negativePrompt: request.negativePrompt || "",
+            aspectRatio: request.aspectRatio || "1:1",
             guidanceScale: request.guidanceScale || 7.5,
             seed: request.seed,
             sampleCount: request.sampleCount || 1,
-            safetySettings: request.safetySettings || 'block_some'
+            safetySettings: request.safetySettings || "block_some"
           }
         ],
         parameters: {
@@ -42,60 +52,76 @@ class GoogleImageAPI {
 
       const response = await axios.post(this.getEndpoint(), payload, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json"
         }
       });
 
-      const images: GeneratedImage[] = response.data.predictions.map((prediction: any, index: number) => ({
-        id: `${Date.now()}-${index}`,
-        url: `data:image/png;base64,${prediction.bytesBase64Encoded}`,
-        prompt: request.prompt,
-        timestamp: new Date(),
-        aspectRatio: request.aspectRatio || '1:1'
-      }));
+      const images: GeneratedImage[] = response.data.predictions.map(
+        (prediction: { bytesBase64Encoded: string }, index: number) => ({
+          id: `${Date.now()}-${index}`,
+          url: `data:image/png;base64,${prediction.bytesBase64Encoded}`,
+          prompt: request.prompt,
+          timestamp: new Date(),
+          aspectRatio: request.aspectRatio || "1:1"
+        })
+      );
 
       return { images };
-    } catch (error: any) {
-      console.error('Error generating images:', error);
-      
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number } };
+      console.error("Error generating images:", error);
+
       // Fallback to mock generation for demo purposes
-      if (error.response?.status === 401 || error.response?.status === 403) {
+      if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
         return {
           images: [],
-          error: 'Authentication failed. Please check your Google Cloud API key and project configuration.'
+          error:
+            "Authentication failed. Please check your Google Cloud API key and project configuration."
         };
       }
-      
+
       return this.mockGeneration(request);
     }
   }
 
   private async mockGeneration(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
     // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+    await new Promise((resolve) => setTimeout(resolve, 2000 + Math.random() * 3000));
 
     const count = request.sampleCount || 1;
     const images: GeneratedImage[] = [];
 
     for (let i = 0; i < count; i++) {
       // Using placeholder images for demo
-      const width = request.aspectRatio === '16:9' ? 1024 : 
-                   request.aspectRatio === '9:16' ? 576 : 
-                   request.aspectRatio === '4:3' ? 1024 : 
-                   request.aspectRatio === '3:4' ? 768 : 1024;
-      
-      const height = request.aspectRatio === '16:9' ? 576 : 
-                    request.aspectRatio === '9:16' ? 1024 : 
-                    request.aspectRatio === '4:3' ? 768 : 
-                    request.aspectRatio === '3:4' ? 1024 : 1024;
+      const width =
+        request.aspectRatio === "16:9"
+          ? 1024
+          : request.aspectRatio === "9:16"
+          ? 576
+          : request.aspectRatio === "4:3"
+          ? 1024
+          : request.aspectRatio === "3:4"
+          ? 768
+          : 1024;
+
+      const height =
+        request.aspectRatio === "16:9"
+          ? 576
+          : request.aspectRatio === "9:16"
+          ? 1024
+          : request.aspectRatio === "4:3"
+          ? 768
+          : request.aspectRatio === "3:4"
+          ? 1024
+          : 1024;
 
       images.push({
         id: `mock-${Date.now()}-${i}`,
         url: `https://picsum.photos/${width}/${height}?random=${Date.now() + i}&blur=1`,
         prompt: request.prompt,
         timestamp: new Date(),
-        aspectRatio: request.aspectRatio || '1:1'
+        aspectRatio: request.aspectRatio || "1:1"
       });
     }
 
