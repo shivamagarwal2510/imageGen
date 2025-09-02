@@ -7,12 +7,13 @@ import {
 
 class GoogleImageAPI {
   private projectId: string;
-  private apiKey: string;
+  private clientId: string;
   private location: string;
+  private accessToken: string | null = null;
 
   constructor() {
     this.projectId = import.meta.env.VITE_GOOGLE_CLOUD_PROJECT_ID || "";
-    this.apiKey = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY || "";
+    this.clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
     this.location = import.meta.env.VITE_VERTEX_AI_LOCATION || "us-central1";
   }
 
@@ -20,16 +21,77 @@ class GoogleImageAPI {
     return `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/imagen-3.0-generate-001:predict`;
   }
 
+  public async signIn(): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (!this.clientId || this.clientId === "your-client-id-here") {
+        console.warn("Google Client ID not configured");
+        resolve(false);
+        return;
+      }
+
+      // Initialize Google Identity Services
+      (
+        window as unknown as {
+          google: {
+            accounts: {
+              oauth2: {
+                initTokenClient: (config: {
+                  client_id: string;
+                  scope: string;
+                  callback: (response: { access_token?: string }) => void;
+                }) => { requestAccessToken: () => void };
+              };
+            };
+          };
+        }
+      ).google.accounts.oauth2
+        .initTokenClient({
+          client_id: this.clientId,
+          scope: "https://www.googleapis.com/auth/cloud-platform",
+          callback: (response: { access_token?: string }) => {
+            if (response.access_token) {
+              this.accessToken = response.access_token;
+              console.log("Successfully authenticated with Google Cloud");
+              resolve(true);
+            } else {
+              console.error("Failed to obtain access token");
+              resolve(false);
+            }
+          }
+        })
+        .requestAccessToken();
+    });
+  }
+
+  public signOut(): void {
+    const token = this.accessToken;
+    this.accessToken = null;
+    if (
+      (
+        window as unknown as {
+          google?: { accounts?: { oauth2?: { revoke: (token: string | null) => void } } };
+        }
+      ).google?.accounts?.oauth2
+    ) {
+      (
+        window as unknown as {
+          google: { accounts: { oauth2: { revoke: (token: string | null) => void } } };
+        }
+      ).google.accounts.oauth2.revoke(token);
+    }
+  }
+
+  public isSignedIn(): boolean {
+    return !!this.accessToken;
+  }
+
   async generateImages(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
     try {
-      // Check if API key and project ID are configured
-      if (
-        !this.apiKey ||
-        this.apiKey === "YOUR_API_KEY" ||
-        !this.projectId ||
-        this.projectId === "your-project-id-here"
-      ) {
-        console.warn("Google Cloud credentials not configured. Using mock generation.");
+      // Check if access token is available
+      if (!this.accessToken || !this.projectId || this.projectId === "your-project-id-here") {
+        console.warn(
+          "Google Cloud credentials not configured or user not signed in. Using mock generation."
+        );
         return this.mockGeneration(request);
       }
 
@@ -52,7 +114,7 @@ class GoogleImageAPI {
 
       const response = await axios.post(this.getEndpoint(), payload, {
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": "application/json"
         }
       });

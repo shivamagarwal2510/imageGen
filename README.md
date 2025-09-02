@@ -24,12 +24,13 @@ A React application that uses Google Cloud's Vertex AI Imagen API to generate im
    - **Vertex AI API**
    - **Cloud Resource Manager API** (if not already enabled)
 
-### Step 3: Create API Key
+### Step 3: Create OAuth 2.0 Credentials
 
 1. Go to "APIs & Services" > "Credentials"
-2. Click "Create Credentials" > "API Key"
-3. Copy the generated API key
-4. (Recommended) Restrict the API key to only the Vertex AI API
+2. Click "Create Credentials" > "OAuth client ID"
+3. Choose "Web application" as the application type
+4. Add your domain to "Authorized JavaScript origins" (e.g., `http://localhost:5173` for development)
+5. Copy the generated Client ID
 
 ### Step 4: Set up Billing
 
@@ -51,14 +52,14 @@ Create a `.env` file in the root directory with the following content:
 ```env
 # Google Cloud Configuration
 VITE_GOOGLE_CLOUD_PROJECT_ID=your-actual-project-id
-VITE_GOOGLE_CLOUD_API_KEY=your-actual-api-key
+VITE_GOOGLE_CLIENT_ID=your-oauth-client-id
 VITE_VERTEX_AI_LOCATION=us-central1
 ```
 
 Replace:
 
 - `your-actual-project-id` with your Google Cloud Project ID
-- `your-actual-api-key` with the API key you created
+- `your-oauth-client-id` with the OAuth 2.0 Client ID you created
 
 ### Step 3: Run the Development Server
 
@@ -77,7 +78,9 @@ npm run dev
 
 ### Authentication Error (401)
 
-- Verify your API key is correct and has Vertex AI permissions
+- Verify your OAuth 2.0 Client ID is correct
+- Make sure you're signed in through the app's "Sign In with Google" button
+- Check that your domain is added to authorized JavaScript origins in OAuth settings
 - Ensure your Project ID is correct
 - Check that Vertex AI API is enabled in your project
 - Verify billing is enabled on your Google Cloud project
